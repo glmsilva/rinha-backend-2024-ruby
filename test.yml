@@ -1,0 +1,76 @@
+config:
+  target: 'http://127.0.0.1:9999'  # Endereço da API de destino
+  phases:
+    - duration: 60  # Teste durante 60 segundos
+      arrivalRate: 30
+    - duration: 30
+      arrivalRate: 100
+    - duration: 60
+      arrivalRate: 30
+  processor: './processor.js'  # Arquivo JS para gerar dados aleatórios
+
+scenarios:
+  - name: 'Testar Débitos'
+    flow:
+      - function: "generateTransactionData"
+      - post:
+          url: "/clientes/{{ clienteId }}/transacoes"
+          headers:
+            Content-Type: "application/json"
+          body: "{{ payload }}"
+          capture:
+            - json: "limite"
+              as: "limite"
+            - json: "saldo"
+              as: "saldo"
+          expect:
+            - statusCode: 200
+            - custom: "validateTransactionBalance"
+
+  - name: 'Testar Créditos'
+    flow:
+      - function: "generateTransactionData"
+      - post:
+          url: "/clientes/{{ clienteId }}/transacoes"
+          headers:
+            Content-Type: "application/json"
+          body: "{{ payload }}"
+          capture:
+            - json: "limite"
+              as: "limite"
+            - json: "saldo"
+              as: "saldo"
+          expect:
+            - statusCode: 200
+            - custom: "validateTransactionBalance"
+
+  - name: 'Testar Extrato'
+    flow:
+      - function: "generateTransactionData"
+      - get:
+          url: "/clientes/{{ clienteId }}/extrato"
+          expect:
+            statusCode: 200
+
+  - name: 'Validação HTTP 404'
+    flow:
+      - function: "generateTransactionData"
+      - get:
+          url: "/clientes/6/extrato"
+          expect:
+            statusCode: 404
+    count: 5
+
+  - name: 'Validação tipo errado'
+    flow:
+      - function: "generateTransactionData"
+      - post:
+          url: "/clientes/{{ clienteId }}/transacoes"
+          headers:
+            Content-Type: "application/json"
+          json:
+            valor: 1
+            tipo: 'x'
+            descricao: "{{ descricao }}"
+          expect:
+            - statusCode: 422
